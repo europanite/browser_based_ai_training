@@ -36,6 +36,10 @@
     "react-navigation": "^5.0.0"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-expo": "^51.0.0",
+    "@testing-library/jest-native": "^5.4.3",
+    "jest-environment-jsdom": "^29.7.0",
     "@babel/core": "^7.25.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react-native": "^13.3.3",
