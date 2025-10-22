@@ -1,6 +1,5 @@
  module.exports = {
    preset: 'jest-expo',
-   testEnvironment: 'jsdom',
    setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
      '\\.(png|jpe?g|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
