@@ -4,10 +4,7 @@
   moduleNameMapper: {
      '\\.(png|jpe?g|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
      '\\.(css|scss)$': '<rootDir>/__mocks__/styleMock.js',
-     'react-native-reanimated': 'react-native-reanimated/mock',
-    '^expo($|/.+)': '<rootDir>/__mocks__/expoMock.js',
-    '^expo-router($|/.+)': '<rootDir>/__mocks__/expoRouterMock.js',
-    '^expo-constants$': '<rootDir>/__mocks__/expoConstantsMock.js',
+     'react-native-reanimated': 'react-native-reanimated/mock'
    },
   setupFiles: ['<rootDir>/jest.setupFiles.js'],
    transformIgnorePatterns: [
