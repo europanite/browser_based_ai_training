@@ -1,12 +1,12 @@
 <!-- P2M_REPORT -->
-<!-- GENERATED at 2025-10-22 14:29:24 -->
+<!-- GENERATED at 2025-10-22 14:34:22 -->
 # Project Export: browser_based_ai_training
 
 ## Overview
 
 - Root: `/home/skinner/browser_based_ai_training`
 - Files: **43**
-- Total size: **52163 bytes**
+- Total size: **52161 bytes**
 - Total LOC: 1450 | SLOC: 1234 | TODOs: 0
 
 ### Language mix
@@ -1330,11 +1330,11 @@ registerRootComponent(App);
 
 <a id="frontend-app-jest.config.ts"></a>
 ### 30. `frontend/app/jest.config.ts`
-- Size: 742 bytes | LOC: 24 | SLOC: 24 | TODOs: 0 | Modified: 2025-10-22 14:28:08 | SHA1: 46bcf0160b99
+- Size: 740 bytes | LOC: 24 | SLOC: 24 | TODOs: 0 | Modified: 2025-10-22 14:33:48 | SHA1: acb93beafa95
 
 #### Brief
 module.exports = {
-   preset: 'jest-expo',
+  preset: 'jest-expo',
 
 #### Auto Summary
 module.exports = {
@@ -1343,8 +1343,8 @@ module.exports = {
 
 ```typescript
  module.exports = {
-   preset: 'jest-expo',
-   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  preset: 'jest-expo',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
      '\\.(png|jpe?g|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
      '\\.(css|scss)$': '<rootDir>/__mocks__/styleMock.js',
