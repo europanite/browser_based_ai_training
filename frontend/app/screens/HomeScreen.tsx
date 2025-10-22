@@ -140,7 +140,7 @@ export default function HomeScreen() {
       for (let i = 0; i < pendingFiles.length; i++) {
         const { file, label } = pendingFiles[i];
         const img = await fileToImage(file);
-        const logits = tf.tidy(() => net.infer(img, "conv_preds") as tf.Tensor);
+        const logits = tf.tidy(() => net.infer(img, true) as tf.Tensor);
         clfRef.current.addExample(logits, label);
         logits.dispose();
         if (i % BATCH === 0) await tf.nextFrame();
@@ -176,7 +176,7 @@ export default function HomeScreen() {
     setPred(null);
     try {
       const img = await fileToImage(testFile);
-      const logits = tf.tidy(() => net.infer(img, "conv_preds") as tf.Tensor);
+      const logits = tf.tidy(() => net.infer(img, true) as tf.Tensor);
       const res = await clfRef.current.predictClass(logits, 5);
       logits.dispose();
       setPred({ label: res.label, confidences: (res.confidences as any) || {} });
@@ -211,7 +211,7 @@ export default function HomeScreen() {
         webkitdirectory="true"
         mozdirectory="true"
         directory="true"
-        style={{ marginRight: 8, marginVertical: 4 }}
+        style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
     );
@@ -224,7 +224,7 @@ export default function HomeScreen() {
       <input
         type="file"
         accept="image/*"
-        style={{ marginRight: 8, marginVertical: 4 }}
+        style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onSelectTest((e.target.files as FileList)?.[0] || null)}
       />
     );
