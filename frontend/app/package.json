@@ -7,7 +7,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "expo export -p web",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "@emotion/styled": "^11.14.1",
@@ -35,11 +38,14 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.0.10",
+    "jest-expo": "^51.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "ts-node": "^10.9.2",
     "typescript": "~5.8.3"
   },
   "private": true
