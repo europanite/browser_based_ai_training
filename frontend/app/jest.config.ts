@@ -6,7 +6,6 @@
      '\\.(css|scss)$': '<rootDir>/__mocks__/styleMock.js',
      'react-native-reanimated': 'react-native-reanimated/mock'
    },
-  setupFiles: ['<rootDir>/jest.setupFiles.js'],
    transformIgnorePatterns: [
      'node_modules/(?!(react-native'
        + '|@react-native'
