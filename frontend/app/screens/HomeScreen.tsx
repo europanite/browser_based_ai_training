@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Linking } from "react-native";
 import * as tf from "@tensorflow/tfjs";
 import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as knn from "@tensorflow-models/knn-classifier";
@@ -199,6 +199,8 @@ export default function HomeScreen() {
     pushMsg("Cleared classifier, pending files, and previews.");
   }, [pushMsg]);
 
+  const REPO_URL = "https://github.com/europanite/browser_based_ai_training";
+
   // -------------------------------------------------------------------------
   // UI helpers
   // -------------------------------------------------------------------------
@@ -244,7 +246,21 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#f8fafc" }} contentContainerStyle={{ padding: 16 }}>
-      <Text style={{ fontSize: 24, fontWeight: "800", marginBottom: 12 }}>Browser Based AI Training</Text>
+
+
+      <TouchableOpacity onPress={() => Linking.openURL(REPO_URL)}>
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: "800",
+            marginBottom: 12,
+            color: "#1d4ed8",
+            textDecorationLine: "underline",
+          }}
+        >
+          Browser Based AI Training
+        </Text>
+      </TouchableOpacity>
 
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
         <SectionTitle>Status</SectionTitle>
@@ -317,7 +333,7 @@ export default function HomeScreen() {
 
       {/* Previews of imported images */}
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
-        <SectionTitle>Training/Imported Previews (latest first)</SectionTitle>
+        <SectionTitle>Training Data Previews (latest first)</SectionTitle>
         {trainPreviews.length === 0 ? (
           <Text style={{ color: "#666" }}>(Nothing yet)</Text>
         ) : (
