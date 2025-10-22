@@ -211,9 +211,9 @@ export default function HomeScreen() {
       <input
         type="file"
         /* Non-standard directory selection (Chromium/Safari/Firefox) */
-        webkitdirectory="true"
-        mozdirectory="true"
-        directory="true"
+        webkitdirectory
+        mozdirectory
+        directory
         style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
