@@ -10,6 +10,7 @@ jobs:
       EXPO_TUNNEL: "false"
       EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
       EXPO_PUBLIC_API_BASE: http://localhost:8000
+      REACT_NATIVE_PACKAGER_HOSTNAME: 192.168.3.2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
