@@ -4,7 +4,7 @@
 [![docker](https://github.com/europanite/browser_based_ai_training/actions/workflows/docker.yml/badge.svg)](https://github.com/europanite/browser_based_ai_training/actions/workflows/docker.yml)
 [![GitHub Pages](https://github.com/europanite/browser_based_ai_training/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/europanite/browser_based_ai_training/actions/workflows/deploy-pages.yml)
 
-A Browser-Based AI Training Playground. 
+A Client Side Browser-Based AI Training Playground. 
 
 !["web_ui"](./assets/images/web_ui.png)
 
