@@ -27,6 +27,51 @@ async function fileToImage(file: File): Promise<HTMLImageElement> {
   return img; // caller keeps the objectURL alive for previews
 }
 
+async function pickFolderAndCollectImages(): Promise<Array<{ file: File; label: string; uri: string }>> {
+  // 標準API。型は lib.dom に含まれるので追加設定不要
+  const root = await showDirectoryPicker();
+
+  const out: Array<{ file: File; label: string; uri: string }> = [];
+
+  async function walk(dir: FileSystemDirectoryHandle, ancestors: string[]) {
+    for await (const [name, handle] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+      if (handle.kind === "directory") {
+        await walk(handle as FileSystemDirectoryHandle, [...ancestors, name]);
+      } else {
+        const file = await (handle as FileSystemFileHandle).getFile();
+        if (!file.type.startsWith("image/")) continue;
+
+        // 親フォルダ名をクラス名にする: .../<label>/<file>
+        const label = ancestors.length ? ancestors[ancestors.length - 1] : "root";
+        const uri = URL.createObjectURL(file);
+        out.push({ file, label, uri });
+      }
+    }
+  }
+
+  await walk(root, []);
+  return out;
+}
+
+const onPickFolderClick = useCallback(async () => {
+  try {
+    setLoading("Scanning folder...");
+    const files = await pickFolderAndCollectImages(); // ← 新関数
+    if (files.length === 0) {
+      pushMsg("No images found in the selected folder.");
+      return;
+    }
+    setPendingFiles(prev => [...files, ...prev]);
+    setTrainPreviews(prev => [...files.map(f => ({ uri: f.uri, label: f.label })), ...prev].slice(0, 200));
+    pushMsg(`Imported ${files.length} image(s) pending for learning.`);
+  } catch (e: any) {
+    // ユーザーがキャンセルした場合などもここに来る
+    pushMsg(`[ERROR] folder import: ${e?.message || e}`);
+  } finally {
+    setLoading(null);
+  }
+}, [pushMsg]);
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <Text style={{ fontWeight: "700", fontSize: 18, marginBottom: 8 }}>{children}</Text>;
 }
@@ -202,18 +247,15 @@ export default function HomeScreen() {
   // -------------------------------------------------------------------------
   // UI helpers
   // -------------------------------------------------------------------------
-  const FilePickFolder = () => {
+  const FolderButton = () => {
     if (!isWeb) return null as any;
     return (
-      // @ts-ignore – directory upload attributes (supported on Chromium-based browsers & Safari)
-      <input
-        type="file"
-        webkitdirectory="true"
-        mozdirectory="true"
-        directory="true"
-        style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
-        onChange={(e: any) => onAddFolder(e.target.files as FileList)}
-      />
+      <TouchableOpacity
+        onPress={onPickFolderClick}
+        style={{ backgroundColor: "#f1f5f9", borderWidth: 1, borderColor: "#e2e8f0", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}
+      >
+        <Text style={{ fontWeight: "700", color: "#0f172a" }}>Select Folder…</Text>
+      </TouchableOpacity>
     );
   };
 
@@ -266,7 +308,7 @@ export default function HomeScreen() {
           Please select the top folder. The directory name above each image will be used as the class name.
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <FilePickFolder />
+          <FolderButton />
           <TouchableOpacity onPress={onLearn} style={{ backgroundColor: "#dcfce7", borderWidth: 1, borderColor: "#bbf7d0", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
             <Text style={{ fontWeight: "800", color: "#166534" }}>Learn</Text>
           </TouchableOpacity>

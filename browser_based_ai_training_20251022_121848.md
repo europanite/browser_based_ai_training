@@ -1,12 +1,12 @@
 <!-- P2M_REPORT -->
-<!-- GENERATED at 2025-10-22 12:13:06 -->
+<!-- GENERATED at 2025-10-22 12:18:48 -->
 # Project Export: browser_based_ai_training
 
 ## Overview
 
 - Root: `/home/skinner/browser_based_ai_training`
 - Files: **40**
-- Total size: **51746 bytes**
+- Total size: **51754 bytes**
 - Total LOC: 1430 | SLOC: 1220 | TODOs: 0
 
 ### Language mix
@@ -21,7 +21,7 @@
 - dockerfile: 1
 
 ### Top 12 largest files (bytes)
-- `frontend/app/screens/HomeScreen.tsx` — 15172 bytes
+- `frontend/app/screens/HomeScreen.tsx` — 15180 bytes
 - `LICENSE` — 11340 bytes
 - `CODE_OF_CONDUCT.md` — 4085 bytes
 - `.github/workflows/ci.yml` — 2297 bytes
@@ -1451,7 +1451,7 @@ google-site-verification: google095bf08db4fb15d0.html
 
 <a id="frontend-app-screens-HomeScreen.tsx"></a>
 ### 34. `frontend/app/screens/HomeScreen.tsx`
-- Size: 15172 bytes | LOC: 355 | SLOC: 296 | TODOs: 0 | Modified: 2025-10-22 11:05:06 | SHA1: d3b0cbc75fdd
+- Size: 15180 bytes | LOC: 355 | SLOC: 296 | TODOs: 0 | Modified: 2025-10-22 12:16:43 | SHA1: 59423366e9c2
 
 #### Brief
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1605,7 +1605,7 @@ export default function HomeScreen() {
       for (let i = 0; i < pendingFiles.length; i++) {
         const { file, label } = pendingFiles[i];
         const img = await fileToImage(file);
-        const logits = tf.tidy(() => net.infer(img, "conv_preds") as tf.Tensor);
+        const logits = tf.tidy(() => net.infer(img, true) as tf.Tensor);
         clfRef.current.addExample(logits, label);
         logits.dispose();
         if (i % BATCH === 0) await tf.nextFrame();
@@ -1641,7 +1641,7 @@ export default function HomeScreen() {
     setPred(null);
     try {
       const img = await fileToImage(testFile);
-      const logits = tf.tidy(() => net.infer(img, "conv_preds") as tf.Tensor);
+      const logits = tf.tidy(() => net.infer(img, true) as tf.Tensor);
       const res = await clfRef.current.predictClass(logits, 5);
       logits.dispose();
       setPred({ label: res.label, confidences: (res.confidences as any) || {} });
@@ -1676,7 +1676,7 @@ export default function HomeScreen() {
         webkitdirectory="true"
         mozdirectory="true"
         directory="true"
-        style={{ marginRight: 8, marginVertical: 4 }}
+        style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
     );
@@ -1689,7 +1689,7 @@ export default function HomeScreen() {
       <input
         type="file"
         accept="image/*"
-        style={{ marginRight: 8, marginVertical: 4 }}
+        style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onSelectTest((e.target.files as FileList)?.[0] || null)}
       />
     );
