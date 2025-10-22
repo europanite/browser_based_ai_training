@@ -1,0 +1,43 @@
+{
+  "name": "src",
+  "license": "0BSD",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@emotion/styled": "^11.14.1",
+    "@expo/metro-runtime": "~5.0.4",
+    "@mswjs/interceptors": "^0.26.10",
+    "@mui/joy": "^5.0.0-beta.52",
+    "@mui/material": "^7.2.0",
+    "@react-navigation/native": "^7.1.16",
+    "@react-navigation/native-stack": "^7.3.23",
+    "@tensorflow-models/knn-classifier": "^1.2.6",
+    "@tensorflow-models/mobilenet": "^2.1.1",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "aws-sdk": "^2.1692.0",
+    "expo": "~53.0.20",
+    "expo-status-bar": "~2.2.3",
+    "mock-aws-s3": "^4.0.2",
+    "nock": "^13.5.4",
+    "pyodide": "^0.23.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-paper": "^5.14.5",
+    "react-native-web": "^0.20.0",
+    "react-navigation": "^5.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
+  },
+  "private": true
+}
