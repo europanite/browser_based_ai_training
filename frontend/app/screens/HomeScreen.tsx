@@ -199,7 +199,7 @@ export default function HomeScreen() {
     pushMsg("Cleared classifier, pending files, and previews.");
   }, [pushMsg]);
 
-  const REPO_URL = "https://github.com/europanite/browser_based_ai_training";
+  const REPO_URL = "https://github.com/europanite/client_side_ai_training";
 
   // -------------------------------------------------------------------------
   // UI helpers
@@ -259,7 +259,7 @@ export default function HomeScreen() {
             textDecorationLine: "underline",
           }}
         >
-          Browser Based AI Training
+          Client Side AI Training
         </Text>
       </TouchableOpacity>
 
@@ -278,7 +278,7 @@ export default function HomeScreen() {
 
       {/* Step 1: Import folder */}
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
-        <SectionTitle>1. Import Data </SectionTitle>
+        <SectionTitle>1. Train </SectionTitle>
         <Text style={{ marginBottom: 8 }}>
           Please select the top folder. The directory name above each image will be used as the class name.
         </Text>
@@ -297,7 +297,7 @@ export default function HomeScreen() {
 
       {/* Step 2: Pick test & Predict */}
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
-        <SectionTitle>2) Test a image </SectionTitle>
+        <SectionTitle>2) Test </SectionTitle>
         <Text style={{ marginBottom: 8 }}>Select a test image and then press "Predict".</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <FilePickTest />

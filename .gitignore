@@ -55,4 +55,4 @@ frontend/app/coverage/
 frontend/app/.jest-cache/
 
 make_md.py
-browser_based_ai_training_*
+client_side_ai_training*

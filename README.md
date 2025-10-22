@@ -1,15 +1,14 @@
-# [Browser Based AI Training](https://github.com/europanite/browser_based_ai_training "Browser Based AI Training")
+# [Client Side AI Training](https://github.com/europanite/client_side_ai_training "Client Side AI Training")
 
-[![CI](https://github.com/europanite/browser_based_ai_training/actions/workflows/ci.yml/badge.svg)](https://github.com/europanite/browser_based_ai_training/actions/workflows/ci.yml)
-[![docker](https://github.com/europanite/browser_based_ai_training/actions/workflows/docker.yml/badge.svg)](https://github.com/europanite/browser_based_ai_training/actions/workflows/docker.yml)
-[![GitHub Pages](https://github.com/europanite/browser_based_ai_training/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/europanite/browser_based_ai_training/actions/workflows/deploy-pages.yml)
+[![CI](https://github.com/europanite/client_side_ai_training/actions/workflows/ci.yml/badge.svg)](https://github.com/europanite/client_side_ai_training/actions/workflows/ci.yml)
+[![GitHub Pages](https://github.com/europanite/client_side_ai_training/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/europanite/client_side_ai_training/actions/workflows/deploy-pages.yml)
 
 A Client Side Browser-Based AI Training Playground. 
 
 !["web_ui"](./assets/images/web_ui.png)
 
 ##  Demo
- [Browser Based AI Training](https://europanite.github.io/browser_based_ai_training/)
+ [Client Side AI Training](https://europanite.github.io/client_side_ai_training/)
 
 ---
 
