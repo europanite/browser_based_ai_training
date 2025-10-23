@@ -10,6 +10,25 @@ A Client Side Browser-Based AI Training Playground.
 ##  Demo
  [Client Side AI Training](https://europanite.github.io/client_side_ai_training/)
 
+## Data Structure
+
+ROOT_DIRECTORY
+├── CLASS_NAME_1
+│   ├── image_01.png
+│   ├── image_02.png
+│   ├── image_03.png
+│   ├── ...
+├── CLASS_NAME_2
+│   ├── image_01.png
+│   ├── image_02.png
+│   ├── image_03.png
+│   ├── ...
+├── CLASS_NAME_3
+│   ├── image_01.png
+│   ├── image_02.png
+│   ├── image_03.png
+│   ├── ...
+
 ---
 
 ## 🚀 Getting Started
