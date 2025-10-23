@@ -206,15 +206,14 @@ export default function HomeScreen() {
   // -------------------------------------------------------------------------
   const FilePickFolder = () => {
     if (!isWeb) return null as any;
-    return (
+      return (
       // @ts-ignore – directory upload attributes (supported on Chromium-based browsers & Safari)
       <input
         type="file"
-        /* Non-standard directory selection (Chromium/Safari/Firefox) */
-        webkitdirectory
-        mozdirectory
-        directory
-        style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
+        webkitdirectory="true"
+        mozdirectory="true"
+        directory="true"
+        style={{ marginRight: 8, marginVertical: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
     );
@@ -276,7 +275,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Step 1: Import folder */}
+      {/* Step 1: Import train data */}
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
         <SectionTitle>1. Train </SectionTitle>
         <Text style={{ marginBottom: 8 }}>
