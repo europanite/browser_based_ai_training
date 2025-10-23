@@ -12,6 +12,7 @@ A Client Side Browser-Based AI Training Playground.
 
 ## Data Structure
 
+<pre>
 ROOT_DIRECTORY
 ├── CLASS_NAME_1
 │   ├── image_01.png
@@ -28,6 +29,8 @@ ROOT_DIRECTORY
 │   ├── image_02.png
 │   ├── image_03.png
 │   ├── ...
+ ...
+</pre>
 
 ---
 
