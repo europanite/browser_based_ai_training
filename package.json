@@ -1,7 +1,0 @@
-{
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/jest-native": "^5.4.3",
-    "node": "^20.19.4"
-  }
-}
