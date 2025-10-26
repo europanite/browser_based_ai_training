@@ -5,7 +5,7 @@ import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as knn from "@tensorflow-models/knn-classifier";
 
 // ---------------------------------------------------------------------------
-// Helpers (web-only pieces kept minimal and guarded)
+// Helpers
 // ---------------------------------------------------------------------------
 const isWeb = typeof document !== "undefined";
 
@@ -53,7 +53,7 @@ export default function HomeScreen() {
   // Imported-but-not-yet-learned files
   const [pendingFiles, setPendingFiles] = useState<Array<{ file: File; label: string; uri: string }>>([]);
 
-  // Previews (shows imported images regardless of learned or not)
+  // Previews (shows Train images regardless of learned or not)
   const [trainPreviews, setTrainPreviews] = useState<Array<{ uri: string; label: string }>>([]);
 
   // Test image & prediction
@@ -331,9 +331,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Previews of imported images */}
+      {/* Previews of Train images */}
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
-        <SectionTitle>Training Data Previews (latest first)</SectionTitle>
+        <SectionTitle>Training Data Previews</SectionTitle>
         {trainPreviews.length === 0 ? (
           <Text style={{ color: "#666" }}>(Nothing yet)</Text>
         ) : (
