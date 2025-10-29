@@ -210,9 +210,9 @@ export default function HomeScreen() {
       // @ts-ignore – directory upload attributes (supported on Chromium-based browsers & Safari)
       <input
         type="file"
-        webkitdirectory={true}
-        mozdirectory={true}
-        directory={true}
+        webkitdirectory="true"
+        mozdirectory="true"
+        directory="true"
         style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
