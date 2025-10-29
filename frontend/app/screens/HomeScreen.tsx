@@ -210,9 +210,9 @@ export default function HomeScreen() {
       // @ts-ignore – directory upload attributes (supported on Chromium-based browsers & Safari)
       <input
         type="file"
-        webkitdirectory={true}
-        mozdirectory={true}
-        directory={true}
+        webkitdirectory={"true"}
+        mozdirectory={"true"}
+        directory={"true"}
         style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
@@ -243,6 +243,17 @@ export default function HomeScreen() {
       </View>
     );
   }, [classCounts]);
+
+  const groupedPreviews = useMemo(() => {
+    // Map<label, string[] (uris)>
+    const m = new Map<string, string[]>();
+    for (const p of trainPreviews) {
+      const arr = m.get(p.label) ?? [];
+      arr.push(p.uri);
+      m.set(p.label, arr);
+    }
+    return Array.from(m.entries());
+  }, [trainPreviews]);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#f8fafc" }} contentContainerStyle={{ padding: 16 }}>
@@ -333,16 +344,32 @@ export default function HomeScreen() {
 
       {/* Previews of imported images */}
       <View style={{ marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: "#fff" }}>
-        <SectionTitle>Training Data Previews (latest first)</SectionTitle>
-        {trainPreviews.length === 0 ? (
+        <SectionTitle>Training Data Previews</SectionTitle>
+
+        {groupedPreviews.length === 0 ? (
           <Text style={{ color: "#666" }}>(Nothing yet)</Text>
         ) : (
-          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-            {trainPreviews.map((p, idx) => (
-              <View key={idx} style={{ alignItems: "center" }}>
-                {/* @ts-ignore web-only */}
-                <img src={p.uri} alt={p.label} style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
-                <Text style={{ fontSize: 12, marginTop: 4 }}>{p.label}</Text>
+          <View style={{ gap: 12 }}>
+            {groupedPreviews.map(([label, uris]) => (
+              <View key={label} style={{}}>
+                <Text style={{ fontWeight: "700", marginBottom: 6 }}>{label}</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{}}
+                  contentContainerStyle={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  {uris.map((uri, i) => (
+                    <View key={i} style={{ alignItems: "center" }}>
+                      {/* @ts-ignore web-only */}
+                      <img
+                        src={uri}
+                        alt={label}
+                        style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
             ))}
           </View>
