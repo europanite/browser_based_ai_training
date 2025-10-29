@@ -2,15 +2,15 @@ import React from "react";
 import { View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useAuth } from "../context/Auth";
 import { useNavigation } from "@react-navigation/native";
 
-const CONTENT_MAX_W = 480; // ← same as forms
+const BAR_BG = "#000000ff";
+const CONTENT_MAX_W = 480;
 
 export default function SettingsBar() {
   const nav = useNavigation<any>();
   const { width } = useWindowDimensions();
-  const isNarrow = width < 420; // stack buttons below on very small widths
+  const isNarrow = width < 420;
 
   const Btn = ({ title, onPress }: { title: string; onPress: () => void }) => (
     <TouchableOpacity
@@ -28,9 +28,9 @@ export default function SettingsBar() {
   );
 
   return (
-    <SafeAreaView edges={["top"]}>
-      <StatusBar style="dark" />
-      <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+    <SafeAreaView edges={["top"]} style={{ backgroundColor: BAR_BG }}>
+      <StatusBar style="dark" backgroundColor={BAR_BG} />
+      <View style={{ backgroundColor: BAR_BG, paddingHorizontal: 12, paddingVertical: 10 }}>
         <View style={{ alignItems: "center" }}>
           <View style={{ width: "100%", maxWidth: CONTENT_MAX_W, gap: 8 }}>
             <View
