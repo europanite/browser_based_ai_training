@@ -206,13 +206,22 @@ export default function HomeScreen() {
   // -------------------------------------------------------------------------
   const FilePickFolder = () => {
     if (!isWeb) return null as any;
-      return (
-      // @ts-ignore – directory upload attributes (supported on Chromium-based browsers & Safari)
+
+    const ref = useRef<HTMLInputElement | null>(null);
+
+    // Chromium/Safari/Firefox
+    useEffect(() => {
+      if (!ref.current) return;
+      ref.current.setAttribute("webkitdirectory", "");
+      ref.current.setAttribute("directory", "");
+      ref.current.setAttribute("mozdirectory", "");
+    }, []);
+
+    return (
       <input
+        ref={ref}
         type="file"
-        webkitdirectory="true"
-        mozdirectory="true"
-        directory="true"
+        multiple
         style={{ marginRight: 8, marginTop: 4, marginBottom: 4 }}
         onChange={(e: any) => onAddFolder(e.target.files as FileList)}
       />
