@@ -7,13 +7,38 @@ A Client Side Browser-Based AI Training Playground.
 
 !["web_ui"](./assets/images/web_ui.png)
 
-##  Demo
+---
+
+##  🚀 Live Demo
  [Client Side AI Training](https://europanite.github.io/client_side_ai_training/)
+
+---
+
+##  ✨ Features
+
+* **100% client‑side**: No server required; privacy by design.
+* **Folder‑based dataset import**: Use `.../<label>/<image>` layout; labels are derived from folder names.
+* **Fast training**: Uses MobileNet‑V2 as a feature extractor + KNN classifier for instant incremental learning.
+* **Top‑k prediction view**: Shows predicted label and per‑class confidences.
+* **Gallery & console**: Preview imported images and see step‑by‑step logs.
+* **One‑click reset**: Clear classifier, previews, and pending files.
+* **Works on desktop browsers** (Chromium/Safari support directory uploads).
+
+---
+
+## 🧰 How It Works
+
+* **Feature extractor**: [@tensorflow-models/mobilenet] provides embeddings (no fine‑tuning).
+* **Classifier**: [@tensorflow-models/knn-classifier] stores examples and predicts via nearest neighbors.
+* **Performance**: Training scales with example count; memory is bounded by image + embedding sizes.
+* **Privacy**: All computation and data stay in the tab (no network I/O of user images).
+
+---
 
 ## Data Structure
 
 <pre>
-ROOT_DIRECTORY
+DATA_DIRECTORY
 ├── CLASS_NAME_1
 │   ├── image_01.png
 │   ├── image_02.png
@@ -51,6 +76,7 @@ docker compose build
 # Run the container
 docker compose up
 ```
+
 ---
 
 # License
