@@ -5,7 +5,6 @@ import { StatusBar } from "expo-status-bar";
 import { useAuth } from "../context/Auth";
 import { useNavigation } from "@react-navigation/native";
 
-const BAR_BG = "#000000ff";
 const CONTENT_MAX_W = 480; // ← same as forms
 
 export default function SettingsBar() {
@@ -29,9 +28,9 @@ export default function SettingsBar() {
   );
 
   return (
-    <SafeAreaView edges={["top"]} style={{ backgroundColor: BAR_BG }}>
-      <StatusBar style="dark" backgroundColor={BAR_BG} />
-      <View style={{ backgroundColor: BAR_BG, paddingHorizontal: 12, paddingVertical: 10 }}>
+    <SafeAreaView edges={["top"]}>
+      <StatusBar style="dark" />
+      <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
         <View style={{ alignItems: "center" }}>
           <View style={{ width: "100%", maxWidth: CONTENT_MAX_W, gap: 8 }}>
             <View
