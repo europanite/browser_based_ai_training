@@ -18,8 +18,8 @@ function repoRootDataDir() {
 
 function resolveDataDir() {
   const candidates = [
-    process.env.AI_TRAINING_DATA_DIR,
     publicDataDir(),
+    process.env.AI_TRAINING_DATA_DIR,
     repoRootDataDir(),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
