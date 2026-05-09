@@ -372,13 +372,18 @@ export default function HomeScreen() {
           typeof window !== "undefined" ? window.location : null;
         const host = currentLocation?.hostname || "localhost";
         const protocol = currentLocation?.protocol || "http:";
-        const staticOrigin = `${protocol}//${host}:8090`;
+        const isLocalhost =
+          host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+        const localStaticOrigin = `${protocol}//${host}:8090`;
         const manifestCandidates = [
-          `${staticOrigin}/data_manifest.json`,
-          "http://localhost:8090/data_manifest.json",
-          "data_manifest.json",
           "./data_manifest.json",
-          "/data_manifest.json",
+          "data_manifest.json",
+          ...(isLocalhost
+            ? [
+                `${localStaticOrigin}/data_manifest.json`,
+                "http://localhost:8090/data_manifest.json",
+              ]
+            : []),
         ];
 
         let manifest:
@@ -408,7 +413,13 @@ export default function HomeScreen() {
             manifest = JSON.parse(body) as
               | BundledDataManifest
               | BundledDataManifestItem[];
-            manifestBaseUrl = manifestUrl.replace(/\/data_manifest\.json$/, "");
+            const resolvedManifestUrl = new URL(
+              manifestUrl,
+              currentLocation?.href || "http://localhost/"
+            );
+            manifestBaseUrl = new URL(".", resolvedManifestUrl)
+              .toString()
+              .replace(/\/$/, "");
             break;
           } catch (err: any) {
             errors.push(`${manifestUrl}: ${err?.message || String(err)}`);
@@ -434,7 +445,7 @@ export default function HomeScreen() {
           const rawUrl = item.url ?? item.path;
           const url = /^https?:\/\//.test(rawUrl)
             ? rawUrl
-            : `${manifestBaseUrl}/${rawUrl.replace(/^\/+/, "")}`;
+            : new URL(rawUrl.replace(/^\/+/, ""), `${manifestBaseUrl}/`).toString();
           const imageResponse = await fetch(url, { cache: "no-store" });
           if (!imageResponse.ok) {
             throw new Error(`Failed to load ${url}: status=${imageResponse.status}`);
