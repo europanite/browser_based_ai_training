@@ -55,8 +55,7 @@ type BundledDataManifest = {
   items: BundledDataManifestItem[];
 };
 
-const BUNDLED_DATA_DEMO_LIMIT = 100;
-const BUNDLED_DATA_FULL_LIMIT = 500;
+const BUNDLED_DATA_LIMIT = 100;
 const AUTO_LOAD_BUNDLED_DATA = true;
 
 const TRAINING_ALGORITHMS: Array<{ id: TrainingAlgorithm; title: string; note: string }> = [
@@ -258,6 +257,7 @@ export default function HomeScreen() {
     useState<ValidationResult | null>(null);
 
   const autoLoadBundledDataStartedRef = useRef(false);
+  const bundledDataLoadingRef = useRef(false);
 
   const pushMsg = useCallback((s: string) => {
     setMessages((m) => [`[${logTime()}] ${s}`, ...m].slice(0, 200));
@@ -350,40 +350,36 @@ export default function HomeScreen() {
 
   // -------------------------------------------------------------------------
   // Load bundled fixture data from the generated static manifest.
-  // In Expo dev mode, unknown paths on :8081 can fall back to index.html.
-  // The Docker dev server therefore exposes bundled data on :8090.
+  // The manifest and images are served from frontend/app/public on both
+  // GitHub Pages and local Expo web builds.
   // -------------------------------------------------------------------------
-  const onLoadBundledData = useCallback(
-    async (
-      limit = BUNDLED_DATA_DEMO_LIMIT,
-      modeLabel: "demo" | "full" = "demo"
-    ) => {
-      if (!isWeb) {
-        pushMsg("Bundled data loading is only supported on web.");
-        return;
-      }
+  const onLoadBundledData = useCallback(async () => {
+    if (!isWeb) {
+      pushMsg("Bundled data loading is only supported on web.");
+      return;
+    }
 
-      setLoading(`Loading ${modeLabel} bundled fixture data...`);
-      setPred(null);
-      setValidationResult(null);
+    if (bundledDataLoadingRef.current) {
+      pushMsg("Bundled demo data is already loading.");
+      return;
+    }
+
+    if (trainFiles.length > 0 || validationFiles.length > 0) {
+      pushMsg("Bundled demo data is already loaded. Click Clear first to reload it.");
+      return;
+    }
+
+    bundledDataLoadingRef.current = true;
+    setLoading("Loading bundled fixture data...");
+    setPred(null);
+    setValidationResult(null);
 
       try {
         const currentLocation =
           typeof window !== "undefined" ? window.location : null;
-        const host = currentLocation?.hostname || "localhost";
-        const protocol = currentLocation?.protocol || "http:";
-        const isLocalhost =
-          host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
-        const localStaticOrigin = `${protocol}//${host}:8090`;
         const manifestCandidates = [
           "./data_manifest.json",
           "data_manifest.json",
-          ...(isLocalhost
-            ? [
-                `${localStaticOrigin}/data_manifest.json`,
-                "http://localhost:8090/data_manifest.json",
-              ]
-            : []),
         ];
 
         let manifest:
@@ -428,12 +424,12 @@ export default function HomeScreen() {
 
         if (!manifest) {
           throw new Error(
-            `Could not load data_manifest.json. Run docker compose up --build frontend and check http://localhost:8090/data_manifest.json. Tried: ${errors.join(" | ")}`
+            `Could not load data_manifest.json from the web public assets. Confirm frontend/app/public/data_manifest.json is available. Tried: ${errors.join(" | ")}`
           );
         }
 
         const rawItems = Array.isArray(manifest) ? manifest : manifest.items;
-        const selected = pickBalancedManifestItems(rawItems ?? [], limit);
+        const selected = pickBalancedManifestItems(rawItems ?? [], BUNDLED_DATA_LIMIT);
 
         if (selected.length === 0) {
           throw new Error("data_manifest.json does not contain any image entries.");
@@ -457,10 +453,8 @@ export default function HomeScreen() {
           });
           loaded.push({ file, label: item.label, uri: URL.createObjectURL(file) });
 
-          if ((i + 1) % 50 === 0) {
-            pushMsg(
-              `Loaded ${i + 1}/${selected.length} bundled image(s) for ${modeLabel}.`
-            );
+          if ((i + 1) % 25 === 0) {
+            pushMsg(`Loaded ${i + 1}/${selected.length} bundled image(s).`);
             await tf.nextFrame();
           } else if (i % 12 === 0) {
             await tf.nextFrame();
@@ -485,15 +479,15 @@ export default function HomeScreen() {
         setLabelCounts(countByLabel(train));
 
         pushMsg(
-          `Loaded ${modeLabel} bundled fixture data: total=${loaded.length}, train=${train.length}, validation=${validation.length}, labels=${Object.keys(countByLabel(loaded)).join(", ")}`
+          `Loaded bundled fixture data: total=${loaded.length}, train=${train.length}, validation=${validation.length}, labels=${Object.keys(countByLabel(loaded)).join(", ")}`
         );
       } catch (e: any) {
         pushMsg(`[ERROR] load bundled data: ${e?.message || String(e)}`);
       } finally {
+        bundledDataLoadingRef.current = false;
         setLoading(null);
       }
-    },
-    [headModel, pushMsg]
+    }, [headModel, pushMsg, trainFiles.length, validationFiles.length]
   );
 
   // -------------------------------------------------------------------------
@@ -509,7 +503,7 @@ export default function HomeScreen() {
     if (trainFiles.length > 0 || validationFiles.length > 0) return;
 
     autoLoadBundledDataStartedRef.current = true;
-    void onLoadBundledData(BUNDLED_DATA_DEMO_LIMIT, "demo");
+    void onLoadBundledData();
   }, [net, onLoadBundledData, ready, trainFiles.length, validationFiles.length]);
 
   // -------------------------------------------------------------------------
@@ -831,7 +825,7 @@ export default function HomeScreen() {
 
   const onValidateModel = useCallback(async () => {
     if (validationFiles.length === 0) {
-      pushMsg("No validation images. Click 'Load demo data (100)' or 'Load full data (500)' first.");
+      pushMsg("No validation images. Click 'Load bundled data (100)' first.");
       return;
     }
 
@@ -1064,9 +1058,8 @@ export default function HomeScreen() {
         >
           <FilePickFolder />
           <TouchableOpacity
-            onPress={() =>
-              onLoadBundledData(BUNDLED_DATA_DEMO_LIMIT, "demo")
-            }
+            disabled={loading !== null || trainFiles.length > 0 || validationFiles.length > 0}
+            onPress={onLoadBundledData}
             style={{
               backgroundColor: "#ede9fe",
               borderWidth: 1,
@@ -1074,6 +1067,10 @@ export default function HomeScreen() {
               paddingHorizontal: 10,
               paddingVertical: 8,
               borderRadius: 8,
+              opacity:
+                loading !== null || trainFiles.length > 0 || validationFiles.length > 0
+                  ? 0.55
+                  : 1,
             }}
           >
             <Text
@@ -1082,29 +1079,7 @@ export default function HomeScreen() {
                 color: "#5b21b6",
               }}
             >
-              Load demo data (100)
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() =>
-              onLoadBundledData(BUNDLED_DATA_FULL_LIMIT, "full")
-            }
-            style={{
-              backgroundColor: "#dcfce7",
-              borderWidth: 1,
-              borderColor: "#bbf7d0",
-              paddingHorizontal: 10,
-              paddingVertical: 8,
-              borderRadius: 8,
-            }}
-          >
-            <Text
-              style={{
-                fontWeight: "700",
-                color: "#166534",
-              }}
-            >
-              Load full data (500)
+              Load bundled data (100)
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1491,7 +1466,7 @@ export default function HomeScreen() {
         }}
       >
         Notes: Folder format is <code>.../&lt;label&gt;/&lt;image
-        files&gt;</code>. Select a folder, or click <b>Load demo data (100)</b> or <b>Load full data (500)</b>
+        files&gt;</code>. Select a folder, or click <b>Load bundled data (100)</b>
         after preparing <code>data_manifest.json</code>. Choose an algorithm,
         click <b>Train</b>, then click <b>Validate model</b> or choose a test image and
         click <b>Predict</b>. Images never leave your device.
