@@ -34,6 +34,31 @@ type KMeansClassifier = {
   examplesPerLabel: Record<string, number>;
 };
 
+type ValidationResult = {
+  total: number;
+  correct: number;
+  accuracy: number;
+  byLabel: Record<string, { total: number; correct: number; accuracy: number }>;
+};
+
+type BundledDataManifestItem = {
+  path: string;
+  label: string;
+  url?: string;
+};
+
+type BundledDataManifest = {
+  generatedAt?: string;
+  sourceRoot?: string;
+  publicBasePath?: string;
+  total?: number;
+  items: BundledDataManifestItem[];
+};
+
+const BUNDLED_DATA_DEMO_LIMIT = 100;
+const BUNDLED_DATA_FULL_LIMIT = 500;
+const AUTO_LOAD_BUNDLED_DATA = true;
+
 const TRAINING_ALGORITHMS: Array<{ id: TrainingAlgorithm; title: string; note: string }> = [
   {
     id: "dense_head",
@@ -93,6 +118,62 @@ function confidencesFromDistances(labels: string[], distances: number[]) {
     confidences[label] = scores[i] / total;
   });
   return confidences;
+}
+
+function countByLabel(files: Array<{ label: string }>) {
+  return files.reduce<Record<string, number>>((acc, item) => {
+    acc[item.label] = (acc[item.label] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
+function pickBalancedManifestItems(
+  items: BundledDataManifestItem[],
+  maxItems: number
+) {
+  const grouped = new Map<string, BundledDataManifestItem[]>();
+
+  for (const item of items) {
+    const label = item.label.trim();
+    if (!label) continue;
+    const arr = grouped.get(label) ?? [];
+    arr.push(item);
+    grouped.set(label, arr);
+  }
+
+  const labels = Array.from(grouped.keys()).sort();
+  if (labels.length === 0) return [] as BundledDataManifestItem[];
+
+  const perLabel = Math.max(1, Math.floor(maxItems / labels.length));
+  return labels.flatMap((label) =>
+    (grouped.get(label) ?? [])
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .slice(0, perLabel)
+  );
+}
+
+function splitValidationHoldout(files: TrainFile[]) {
+  const grouped = new Map<string, TrainFile[]>();
+  for (const file of files) {
+    const arr = grouped.get(file.label) ?? [];
+    arr.push(file);
+    grouped.set(file.label, arr);
+  }
+
+  const train: TrainFile[] = [];
+  const validation: TrainFile[] = [];
+
+  for (const label of Array.from(grouped.keys()).sort()) {
+    const group = (grouped.get(label) ?? []).sort((a, b) =>
+      a.file.name.localeCompare(b.file.name)
+    );
+    group.forEach((item, index) => {
+      if (index % 4 === 0) validation.push(item);
+      else train.push(item);
+    });
+  }
+
+  return { train, validation };
 }
 
 async function extractNormalizedEmbedding(net: mobilenet.MobileNet, file: File) {
@@ -171,6 +252,13 @@ export default function HomeScreen() {
   const [testFile, setTestFile] = useState<File | null>(null);
   const [pred, setPred] = useState<Pred>(null);
 
+  // Built-in fixture validation set
+  const [validationFiles, setValidationFiles] = useState<TrainFile[]>([]);
+  const [validationResult, setValidationResult] =
+    useState<ValidationResult | null>(null);
+
+  const autoLoadBundledDataStartedRef = useRef(false);
+
   const pushMsg = useCallback((s: string) => {
     setMessages((m) => [`[${logTime()}] ${s}`, ...m].slice(0, 200));
   }, []);
@@ -247,6 +335,8 @@ export default function HomeScreen() {
           setTrainFiles((prev) => [...prev, ...newTrain]);
           setTrainPreviews((prev) => [...previews, ...prev].slice(0, 200));
           setLabelCounts(counts);
+          setValidationFiles([]);
+          setValidationResult(null);
           pushMsg(`Imported ${added} training image(s).`);
         }
       } catch (e: any) {
@@ -257,6 +347,159 @@ export default function HomeScreen() {
     },
     [labelCounts, pushMsg]
   );
+
+  // -------------------------------------------------------------------------
+  // Load bundled fixture data from the generated static manifest.
+  // In Expo dev mode, unknown paths on :8081 can fall back to index.html.
+  // The Docker dev server therefore exposes bundled data on :8090.
+  // -------------------------------------------------------------------------
+  const onLoadBundledData = useCallback(
+    async (
+      limit = BUNDLED_DATA_DEMO_LIMIT,
+      modeLabel: "demo" | "full" = "demo"
+    ) => {
+      if (!isWeb) {
+        pushMsg("Bundled data loading is only supported on web.");
+        return;
+      }
+
+      setLoading(`Loading ${modeLabel} bundled fixture data...`);
+      setPred(null);
+      setValidationResult(null);
+
+      try {
+        const currentLocation =
+          typeof window !== "undefined" ? window.location : null;
+        const host = currentLocation?.hostname || "localhost";
+        const protocol = currentLocation?.protocol || "http:";
+        const staticOrigin = `${protocol}//${host}:8090`;
+        const manifestCandidates = [
+          `${staticOrigin}/data_manifest.json`,
+          "http://localhost:8090/data_manifest.json",
+          "data_manifest.json",
+          "./data_manifest.json",
+          "/data_manifest.json",
+        ];
+
+        let manifest:
+          | BundledDataManifest
+          | BundledDataManifestItem[]
+          | null = null;
+        let manifestBaseUrl = "";
+        const errors: string[] = [];
+
+        for (const manifestUrl of manifestCandidates) {
+          try {
+            const manifestResponse = await fetch(manifestUrl, {
+              cache: "no-store",
+            });
+            const body = await manifestResponse.text();
+            const firstChar = body.trimStart()[0];
+
+            if (!manifestResponse.ok) {
+              errors.push(`${manifestUrl}: status=${manifestResponse.status}`);
+              continue;
+            }
+            if (firstChar !== "{" && firstChar !== "[") {
+              errors.push(`${manifestUrl}: response was not JSON`);
+              continue;
+            }
+
+            manifest = JSON.parse(body) as
+              | BundledDataManifest
+              | BundledDataManifestItem[];
+            manifestBaseUrl = manifestUrl.replace(/\/data_manifest\.json$/, "");
+            break;
+          } catch (err: any) {
+            errors.push(`${manifestUrl}: ${err?.message || String(err)}`);
+          }
+        }
+
+        if (!manifest) {
+          throw new Error(
+            `Could not load data_manifest.json. Run docker compose up --build frontend and check http://localhost:8090/data_manifest.json. Tried: ${errors.join(" | ")}`
+          );
+        }
+
+        const rawItems = Array.isArray(manifest) ? manifest : manifest.items;
+        const selected = pickBalancedManifestItems(rawItems ?? [], limit);
+
+        if (selected.length === 0) {
+          throw new Error("data_manifest.json does not contain any image entries.");
+        }
+
+        const loaded: TrainFile[] = [];
+        for (let i = 0; i < selected.length; i++) {
+          const item = selected[i];
+          const rawUrl = item.url ?? item.path;
+          const url = /^https?:\/\//.test(rawUrl)
+            ? rawUrl
+            : `${manifestBaseUrl}/${rawUrl.replace(/^\/+/, "")}`;
+          const imageResponse = await fetch(url, { cache: "no-store" });
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to load ${url}: status=${imageResponse.status}`);
+          }
+          const blob = await imageResponse.blob();
+          const name = item.path.split("/").pop() || `image-${i}.jpg`;
+          const file = new File([blob], name, {
+            type: blob.type || "image/jpeg",
+          });
+          loaded.push({ file, label: item.label, uri: URL.createObjectURL(file) });
+
+          if ((i + 1) % 50 === 0) {
+            pushMsg(
+              `Loaded ${i + 1}/${selected.length} bundled image(s) for ${modeLabel}.`
+            );
+            await tf.nextFrame();
+          } else if (i % 12 === 0) {
+            await tf.nextFrame();
+          }
+        }
+
+        const { train, validation } = splitValidationHoldout(loaded);
+        if (train.length === 0 || validation.length === 0) {
+          throw new Error("Bundled data must contain both train and validation images.");
+        }
+
+        if (headModel) {
+          headModel.dispose();
+        }
+        setHeadModel(null);
+        setKMeansClassifier(null);
+        setTestFile(null);
+        setTestPreview(null);
+        setTrainFiles(train);
+        setValidationFiles(validation);
+        setTrainPreviews(train.map(({ uri, label }) => ({ uri, label })).slice(0, 200));
+        setLabelCounts(countByLabel(train));
+
+        pushMsg(
+          `Loaded ${modeLabel} bundled fixture data: total=${loaded.length}, train=${train.length}, validation=${validation.length}, labels=${Object.keys(countByLabel(loaded)).join(", ")}`
+        );
+      } catch (e: any) {
+        pushMsg(`[ERROR] load bundled data: ${e?.message || String(e)}`);
+      } finally {
+        setLoading(null);
+      }
+    },
+    [headModel, pushMsg]
+  );
+
+  // -------------------------------------------------------------------------
+  // Auto-load the bundled fixture data once after TensorFlow.js and MobileNet
+  // are ready. This keeps the app usable immediately after page load while
+  // avoiding repeated reloads during re-renders.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!AUTO_LOAD_BUNDLED_DATA) return;
+    if (!ready || !net) return;
+    if (!isWeb) return;
+    if (autoLoadBundledDataStartedRef.current) return;
+    if (trainFiles.length > 0 || validationFiles.length > 0) return;
+
+    autoLoadBundledDataStartedRef.current = true;
+    void onLoadBundledData(BUNDLED_DATA_DEMO_LIMIT, "demo");
+  }, [net, onLoadBundledData, ready, trainFiles.length, validationFiles.length]);
 
   // -------------------------------------------------------------------------
   // Train selected classifier on top of MobileNet features
@@ -272,6 +515,7 @@ export default function HomeScreen() {
     }
 
     setPred(null);
+    setValidationResult(null);
 
     if (trainingAlgorithm === "kmeans_centroid") {
       setLoading("Extracting features & building k-means classifier...");
@@ -479,27 +723,18 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const onPredictBtn = useCallback(async () => {
-    if (!net) {
-      pushMsg("Base model is not ready yet.");
-      return;
-    }
-    if (!testFile) {
-      pushMsg("Pick a test image first.");
-      return;
-    }
-
-    if (trainingAlgorithm === "kmeans_centroid") {
-      if (!kMeansClassifier) {
-        pushMsg("K-means classifier is not trained yet. Click 'Train' first.");
-        return;
+  const predictFile = useCallback(
+    async (file: File) => {
+      if (!net) {
+        throw new Error("Base model is not ready yet.");
       }
 
-      setLoading("Running k-means inference...");
-      setPred(null);
+      if (trainingAlgorithm === "kmeans_centroid") {
+        if (!kMeansClassifier) {
+          throw new Error("K-means classifier is not trained yet. Click 'Train' first.");
+        }
 
-      try {
-        const vec = await extractNormalizedEmbedding(net, testFile);
+        const vec = await extractNormalizedEmbedding(net, file);
         if (vec.length !== kMeansClassifier.featureDim) {
           throw new Error("Feature dimension is inconsistent with the trained classifier.");
         }
@@ -517,28 +752,14 @@ export default function HomeScreen() {
           distances
         );
         const topLabel = kMeansClassifier.labels[bestIdx];
-
-        setPred({ label: topLabel, confidences });
-        pushMsg(`Prediction: ${topLabel}`);
-      } catch (e: any) {
-        pushMsg(`[ERROR] predict k-means: ${e?.message || String(e)}`);
-      } finally {
-        setLoading(null);
+        return { label: topLabel, confidences };
       }
-      return;
-    }
 
-    if (!headModel) {
-      pushMsg("Head model is not trained yet. Click 'Train' first.");
-      return;
-    }
+      if (!headModel) {
+        throw new Error("Head model is not trained yet. Click 'Train' first.");
+      }
 
-    setLoading("Running inference...");
-    setPred(null);
-
-    try {
-      const img = await fileToImage(testFile);
-
+      const img = await fileToImage(file);
       const feat = tf.tidy(() => {
         const emb = net.infer(img, true) as tf.Tensor;
         const flat = emb
@@ -558,27 +779,94 @@ export default function HomeScreen() {
         throw new Error("Label mapping is inconsistent with predictions.");
       }
 
-      // Build confidences map
       const confidences: Record<string, number> = {};
       labelSet.forEach((lab, idx) => {
         confidences[lab] = probs[idx];
       });
 
-      // Find top label
       let bestIdx = 0;
       for (let i = 1; i < probs.length; i++) {
         if (probs[i] > probs[bestIdx]) bestIdx = i;
       }
       const topLabel = labelSet[bestIdx];
+      return { label: topLabel, confidences };
+    },
+    [net, headModel, kMeansClassifier, trainingAlgorithm]
+  );
 
-      setPred({ label: topLabel, confidences });
-      pushMsg(`Prediction: ${topLabel}`);
+  const onPredictBtn = useCallback(async () => {
+    if (!testFile) {
+      pushMsg("Pick a test image first.");
+      return;
+    }
+
+    setLoading(
+      trainingAlgorithm === "kmeans_centroid"
+        ? "Running k-means inference..."
+        : "Running inference..."
+    );
+    setPred(null);
+
+    try {
+      const result = await predictFile(testFile);
+      setPred(result);
+      pushMsg(`Prediction: ${result.label}`);
     } catch (e: any) {
       pushMsg(`[ERROR] predict: ${e?.message || String(e)}`);
     } finally {
       setLoading(null);
     }
-  }, [net, headModel, kMeansClassifier, testFile, trainingAlgorithm, pushMsg]);
+  }, [predictFile, pushMsg, testFile, trainingAlgorithm]);
+
+  const onValidateModel = useCallback(async () => {
+    if (validationFiles.length === 0) {
+      pushMsg("No validation images. Click 'Load demo data (100)' or 'Load full data (500)' first.");
+      return;
+    }
+
+    setLoading("Running model validation...");
+    setValidationResult(null);
+
+    try {
+      const byLabel: ValidationResult["byLabel"] = {};
+      let correct = 0;
+
+      for (let i = 0; i < validationFiles.length; i++) {
+        const item = validationFiles[i];
+        const result = await predictFile(item.file);
+        const ok = result.label === item.label;
+
+        if (!byLabel[item.label]) {
+          byLabel[item.label] = { total: 0, correct: 0, accuracy: 0 };
+        }
+        byLabel[item.label].total += 1;
+        if (ok) {
+          correct += 1;
+          byLabel[item.label].correct += 1;
+        }
+
+        if (i % 8 === 0) {
+          await tf.nextFrame();
+        }
+      }
+
+      Object.values(byLabel).forEach((item) => {
+        item.accuracy = item.total === 0 ? 0 : item.correct / item.total;
+      });
+
+      const total = validationFiles.length;
+      const accuracy = total === 0 ? 0 : correct / total;
+      const nextResult = { total, correct, accuracy, byLabel };
+      setValidationResult(nextResult);
+      pushMsg(
+        `Validation accuracy: ${(accuracy * 100).toFixed(1)}% (${correct}/${total})`
+      );
+    } catch (e: any) {
+      pushMsg(`[ERROR] validation: ${e?.message || String(e)}`);
+    } finally {
+      setLoading(null);
+    }
+  }, [predictFile, pushMsg, validationFiles]);
 
   // Clear all
   const onClearAll = useCallback(() => {
@@ -588,12 +876,14 @@ export default function HomeScreen() {
     setTestFile(null);
     setTestPreview(null);
     setPred(null);
+    setValidationFiles([]);
+    setValidationResult(null);
     if (headModel) {
       headModel.dispose();
     }
     setHeadModel(null);
     setKMeansClassifier(null);
-    pushMsg("Cleared training data, test image, and trained classifiers.");
+    pushMsg("Cleared training data, validation data, test image, and trained classifiers.");
   }, [headModel, pushMsg]);
 
   const REPO_URL = "https://github.com/europanite/client_side_ai_training";
@@ -763,6 +1053,50 @@ export default function HomeScreen() {
         >
           <FilePickFolder />
           <TouchableOpacity
+            onPress={() =>
+              onLoadBundledData(BUNDLED_DATA_DEMO_LIMIT, "demo")
+            }
+            style={{
+              backgroundColor: "#ede9fe",
+              borderWidth: 1,
+              borderColor: "#ddd6fe",
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              borderRadius: 8,
+            }}
+          >
+            <Text
+              style={{
+                fontWeight: "700",
+                color: "#5b21b6",
+              }}
+            >
+              Load demo data (100)
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() =>
+              onLoadBundledData(BUNDLED_DATA_FULL_LIMIT, "full")
+            }
+            style={{
+              backgroundColor: "#dcfce7",
+              borderWidth: 1,
+              borderColor: "#bbf7d0",
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              borderRadius: 8,
+            }}
+          >
+            <Text
+              style={{
+                fontWeight: "700",
+                color: "#166534",
+              }}
+            >
+              Load full data (500)
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={onClearAll}
             style={{
               backgroundColor: "#fee2e2",
@@ -785,6 +1119,9 @@ export default function HomeScreen() {
         </View>
         <Text style={{ color: "#475569", marginBottom: 6 }}>
           Training images: {trainFiles.length}
+        </Text>
+        <Text style={{ color: "#475569", marginBottom: 6 }}>
+          Validation holdout images: {validationFiles.length}
         </Text>
         <View style={{ marginTop: 6 }}>{LabelBadges}</View>
       </View>
@@ -844,27 +1181,83 @@ export default function HomeScreen() {
             );
           })}
         </View>
-        <TouchableOpacity
-          onPress={onTrainHead}
+        <View
           style={{
-            backgroundColor: "#dcfce7",
-            borderWidth: 1,
-            borderColor: "#bbf7d0",
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 8,
-            alignSelf: "flex-start",
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            alignItems: "center",
           }}
         >
-          <Text
+          <TouchableOpacity
+            onPress={onTrainHead}
             style={{
-              fontWeight: "800",
-              color: "#166534",
+              backgroundColor: "#dcfce7",
+              borderWidth: 1,
+              borderColor: "#bbf7d0",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
+              alignSelf: "flex-start",
             }}
           >
-            {trainingAlgorithm === "dense_head" ? "Train head model" : "Train k-means"}
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={{
+                fontWeight: "800",
+                color: "#166534",
+              }}
+            >
+              {trainingAlgorithm === "dense_head" ? "Train head model" : "Train k-means"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onValidateModel}
+            style={{
+              backgroundColor: "#fef3c7",
+              borderWidth: 1,
+              borderColor: "#fde68a",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
+              alignSelf: "flex-start",
+            }}
+          >
+            <Text
+              style={{
+                fontWeight: "800",
+                color: "#92400e",
+              }}
+            >
+              Validate model
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {validationResult && (
+          <View
+            style={{
+              marginTop: 10,
+              padding: 10,
+              borderRadius: 8,
+              backgroundColor: "#fffbeb",
+              borderWidth: 1,
+              borderColor: "#fde68a",
+              gap: 6,
+            }}
+          >
+            <Text style={{ fontWeight: "800", color: "#92400e" }}>
+              Validation accuracy: {(validationResult.accuracy * 100).toFixed(1)}%
+              ({validationResult.correct}/{validationResult.total})
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {Object.entries(validationResult.byLabel).map(([label, item]) => (
+                <Pill key={label}>
+                  {label}: {(item.accuracy * 100).toFixed(1)}%
+                  ({item.correct}/{item.total})
+                </Pill>
+              ))}
+            </View>
+          </View>
+        )}
         <Text
           style={{
             color: "#64748b",
@@ -1087,9 +1480,10 @@ export default function HomeScreen() {
         }}
       >
         Notes: Folder format is <code>.../&lt;label&gt;/&lt;image
-        files&gt;</code>. Select a folder, choose an algorithm, click{" "}
-        <b>Train</b>, then choose a test image and click <b>Predict</b>.
-        Images never leave your device.
+        files&gt;</code>. Select a folder, or click <b>Load demo data (100)</b> or <b>Load full data (500)</b>
+        after preparing <code>data_manifest.json</code>. Choose an algorithm,
+        click <b>Train</b>, then click <b>Validate model</b> or choose a test image and
+        click <b>Predict</b>. Images never leave your device.
       </Text>
     </ScrollView>
   );

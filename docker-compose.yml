@@ -11,20 +11,64 @@ services:
     volumes:
       - ./frontend/app:/app
       - /app/node_modules
+      - ./data:/workspace/data:ro
+      - ./scripts:/workspace/scripts:ro
     environment:
-      EXPO_TUNNEL: ${EXPO_TUNNEL}
-      EXPO_DEVTOOLS_LISTEN_ADDRESS: ${EXPO_DEVTOOLS_LISTEN_ADDRESS}
-      REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME}
-      EXPO_PUBLIC_API_HOST: ${EXPO_PUBLIC_API_HOST}
-      EXPO_PUBLIC_API_PORT: ${EXPO_PUBLIC_API_PORT}
-      EXPO_PUBLIC_API_BASE: ${EXPO_PUBLIC_API_BASE}
+      EXPO_TUNNEL: ${EXPO_TUNNEL:-false}
+      EXPO_DEVTOOLS_LISTEN_ADDRESS: ${EXPO_DEVTOOLS_LISTEN_ADDRESS:-0.0.0.0}
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME:-127.0.0.1}
+      EXPO_PUBLIC_API_HOST: ${EXPO_PUBLIC_API_HOST:-127.0.0.1}
+      EXPO_PUBLIC_API_PORT: ${EXPO_PUBLIC_API_PORT:-8000}
+      EXPO_PUBLIC_API_BASE: ${EXPO_PUBLIC_API_BASE:-http://127.0.0.1:8000}
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=4096}
     ports:
       - "19000:19000"  # Expo dev server (Metro)
       - "19001:19001"  # React Native debugger(old)
       - "19002:19002"  # Expo web UI
       - "8081:8081"    # Metro bundler
-    command: >
-      sh -c "
-        npm install &&
+      - "8090:8090"    # bundled validation data
+    command: |-
+      sh -lc "
+        node /workspace/scripts/prepare_public_data.js /workspace/data /app/public/data_manifest.json data --limit 500 --copy-to /app/public/data &&
+        node <<'NODE' &
+      const http = require('http');
+      const fs = require('fs');
+      const path = require('path');
+      const root = path.resolve('/app/public');
+      const types = {
+        '.json': 'application/json; charset=utf-8',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        '.gif': 'image/gif'
+      };
+
+      http.createServer((req, res) => {
+        const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+        const rel = pathname === '/' ? 'data_manifest.json' : pathname.split('/').filter(Boolean).join('/');
+        const file = path.resolve(root, rel);
+
+        if (file !== root && !file.startsWith(root + path.sep)) {
+          res.writeHead(403);
+          res.end('Forbidden');
+          return;
+        }
+
+        fs.readFile(file, (err, body) => {
+          if (err) {
+            res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+            res.end('Not found');
+            return;
+          }
+          res.writeHead(200, {
+            'content-type': types[path.extname(file).toLowerCase()] || 'application/octet-stream',
+            'access-control-allow-origin': '*',
+            'cache-control': 'no-store'
+          });
+          res.end(body);
+        });
+      }).listen(8090, '0.0.0.0', () => console.log('[static-data] serving /app/public on :8090'));
+      NODE
         npx expo start
       "
