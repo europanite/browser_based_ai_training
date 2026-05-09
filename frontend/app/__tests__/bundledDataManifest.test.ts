@@ -8,12 +8,26 @@ type Manifest = {
   items: Array<{ path: string; label: string; url?: string }>;
 };
 
+function publicDataDir() {
+  return path.resolve(__dirname, '../public/data');
+}
+
 function repoRootDataDir() {
   return path.resolve(__dirname, '../../../data');
 }
 
+function resolveDataDir() {
+  const candidates = [
+    process.env.AI_TRAINING_DATA_DIR,
+    publicDataDir(),
+    repoRootDataDir(),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0];
+}
+
 describe('bundled validation fixture data', () => {
-  const dataDir = process.env.AI_TRAINING_DATA_DIR || repoRootDataDir();
+  const dataDir = resolveDataDir();
   const manifestPath =
     process.env.AI_TRAINING_DATA_MANIFEST ||
     path.resolve(__dirname, '../public/data_manifest.json');
