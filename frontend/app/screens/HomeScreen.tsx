@@ -58,6 +58,74 @@ type BundledDataManifest = {
 const BUNDLED_DATA_LIMIT = 100;
 const AUTO_LOAD_BUNDLED_DATA = true;
 
+const KNOWN_GITHUB_PAGES_BASE_PATHS = [
+  "/client_side_ai_training_environment",
+  "/client_side_ai_training",
+];
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function getCurrentDirectoryUrl(currentLocation: Location | null) {
+  const href = currentLocation?.href || "http://localhost/";
+  return trimTrailingSlash(new URL(".", href).toString());
+}
+
+function getRuntimeBasePaths(currentLocation: Location | null) {
+  if (!currentLocation) return [];
+
+  const firstPathSegment = currentLocation.pathname.split("/").filter(Boolean)[0];
+  const paths = firstPathSegment ? [`/${firstPathSegment}`] : [];
+  return uniqueStrings([...paths, ...KNOWN_GITHUB_PAGES_BASE_PATHS]);
+}
+
+function buildManifestCandidates(currentLocation: Location | null) {
+  const currentDir = getCurrentDirectoryUrl(currentLocation);
+  const candidates = [
+    new URL("data_manifest.json", `${currentDir}/`).toString(),
+    new URL("./data_manifest.json", currentLocation?.href || "http://localhost/").toString(),
+  ];
+
+  if (currentLocation?.origin) {
+    for (const basePath of getRuntimeBasePaths(currentLocation)) {
+      candidates.push(`${currentLocation.origin}${basePath}/data_manifest.json`);
+    }
+    candidates.push(`${currentLocation.origin}/data_manifest.json`);
+  }
+
+  return uniqueStrings(candidates);
+}
+
+function buildBundledAssetCandidates(
+  rawUrl: string,
+  manifestBaseUrl: string,
+  currentLocation: Location | null
+) {
+  if (/^https?:\/\//.test(rawUrl)) {
+    return [rawUrl];
+  }
+
+  const normalizedPath = rawUrl.replace(/^\/+/, "");
+  const candidates = [
+    new URL(normalizedPath, `${trimTrailingSlash(manifestBaseUrl)}/`).toString(),
+    new URL(normalizedPath, `${getCurrentDirectoryUrl(currentLocation)}/`).toString(),
+  ];
+
+  if (currentLocation?.origin) {
+    for (const basePath of getRuntimeBasePaths(currentLocation)) {
+      candidates.push(`${currentLocation.origin}${basePath}/${normalizedPath}`);
+    }
+    candidates.push(`${currentLocation.origin}/${normalizedPath}`);
+  }
+
+  return uniqueStrings(candidates);
+}
+
 const TRAINING_ALGORITHMS: Array<{ id: TrainingAlgorithm; title: string; note: string }> = [
   {
     id: "dense_head",
@@ -374,13 +442,10 @@ export default function HomeScreen() {
     setPred(null);
     setValidationResult(null);
 
-      try {
+    try {
         const currentLocation =
           typeof window !== "undefined" ? window.location : null;
-        const manifestCandidates = [
-          "./data_manifest.json",
-          "data_manifest.json",
-        ];
+        const manifestCandidates = buildManifestCandidates(currentLocation);
 
         let manifest:
           | BundledDataManifest
@@ -439,13 +504,33 @@ export default function HomeScreen() {
         for (let i = 0; i < selected.length; i++) {
           const item = selected[i];
           const rawUrl = item.url ?? item.path;
-          const url = /^https?:\/\//.test(rawUrl)
-            ? rawUrl
-            : new URL(rawUrl.replace(/^\/+/, ""), `${manifestBaseUrl}/`).toString();
-          const imageResponse = await fetch(url, { cache: "no-store" });
-          if (!imageResponse.ok) {
-            throw new Error(`Failed to load ${url}: status=${imageResponse.status}`);
+          const imageCandidates = buildBundledAssetCandidates(
+            rawUrl,
+            manifestBaseUrl,
+            currentLocation
+          );
+          const imageErrors: string[] = [];
+          let imageResponse: Response | null = null;
+
+          for (const url of imageCandidates) {
+            try {
+              const response = await fetch(url);
+              if (response.ok) {
+                imageResponse = response;
+                break;
+              }
+              imageErrors.push(`${url}: status=${response.status}`);
+            } catch (err: any) {
+              imageErrors.push(`${url}: ${err?.message || String(err)}`);
+            }
           }
+
+          if (!imageResponse) {
+            throw new Error(
+              `Failed to load bundled image ${item.path}. Tried: ${imageErrors.join(" | ")}`
+            );
+          }
+
           const blob = await imageResponse.blob();
           const name = item.path.split("/").pop() || `image-${i}.jpg`;
           const file = new File([blob], name, {
@@ -481,13 +566,13 @@ export default function HomeScreen() {
         pushMsg(
           `Loaded bundled fixture data: total=${loaded.length}, train=${train.length}, validation=${validation.length}, labels=${Object.keys(countByLabel(loaded)).join(", ")}`
         );
-      } catch (e: any) {
-        pushMsg(`[ERROR] load bundled data: ${e?.message || String(e)}`);
-      } finally {
-        bundledDataLoadingRef.current = false;
-        setLoading(null);
-      }
-    }, [headModel, pushMsg, trainFiles.length, validationFiles.length]
+    } catch (e: any) {
+      pushMsg(`[ERROR] load bundled data: ${e?.message || String(e)}`);
+    } finally {
+      bundledDataLoadingRef.current = false;
+      setLoading(null);
+    }
+  }, [headModel, pushMsg, trainFiles.length, validationFiles.length]
   );
 
   // -------------------------------------------------------------------------
