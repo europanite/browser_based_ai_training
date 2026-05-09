@@ -25,6 +25,28 @@ type Pred = { label: string; confidences: Record<string, number> } | null;
 
 type TrainFile = { file: File; label: string; uri: string };
 
+type TrainingAlgorithm = "dense_head" | "kmeans_centroid";
+
+type KMeansClassifier = {
+  labels: string[];
+  centroids: number[][];
+  featureDim: number;
+  examplesPerLabel: Record<string, number>;
+};
+
+const TRAINING_ALGORITHMS: Array<{ id: TrainingAlgorithm; title: string; note: string }> = [
+  {
+    id: "dense_head",
+    title: "Dense head",
+    note: "Train a small neural classifier on MobileNet embeddings.",
+  },
+  {
+    id: "kmeans_centroid",
+    title: "K-means / centroid",
+    note: "Fast lightweight classifier based on class centroids.",
+  },
+];
+
 function logTime() {
   const d = new Date();
   return [
@@ -43,6 +65,47 @@ async function fileToImage(file: File): Promise<HTMLImageElement> {
     img.onerror = (err) => rej(err);
   });
   return img;
+}
+
+function l2Normalize(values: number[]) {
+  const norm = Math.sqrt(values.reduce((sum, v) => sum + v * v, 0));
+  if (!Number.isFinite(norm) || norm === 0) return values;
+  return values.map((v) => v / norm);
+}
+
+function squaredDistance(a: number[], b: number[]) {
+  const n = Math.min(a.length, b.length);
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const d = a[i] - b[i];
+    sum += d * d;
+  }
+  return sum;
+}
+
+function confidencesFromDistances(labels: string[], distances: number[]) {
+  const minDistance = Math.min(...distances);
+  const temperature = 0.15;
+  const scores = distances.map((d) => Math.exp(-(d - minDistance) / temperature));
+  const total = scores.reduce((sum, v) => sum + v, 0) || 1;
+  const confidences: Record<string, number> = {};
+  labels.forEach((label, i) => {
+    confidences[label] = scores[i] / total;
+  });
+  return confidences;
+}
+
+async function extractNormalizedEmbedding(net: mobilenet.MobileNet, file: File) {
+  const img = await fileToImage(file);
+  const feat = tf.tidy(() => {
+    const emb = net.infer(img, true) as tf.Tensor;
+    return emb.reshape([emb.shape[emb.shape.length - 1]]) as tf.Tensor1D;
+  });
+  try {
+    return l2Normalize(Array.from(await feat.data()));
+  } finally {
+    feat.dispose();
+  }
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -89,8 +152,14 @@ export default function HomeScreen() {
   const [trainFiles, setTrainFiles] = useState<TrainFile[]>([]);
   const [labelCounts, setLabelCounts] = useState<Record<string, number>>({});
 
+  // Training algorithm and trained classifiers
+  const [trainingAlgorithm, setTrainingAlgorithm] =
+    useState<TrainingAlgorithm>("dense_head");
+
   // Head model
   const [headModel, setHeadModel] = useState<tf.LayersModel | null>(null);
+  const [kMeansClassifier, setKMeansClassifier] =
+    useState<KMeansClassifier | null>(null);
 
   // Previews
   const [trainPreviews, setTrainPreviews] = useState<
@@ -190,7 +259,7 @@ export default function HomeScreen() {
   );
 
   // -------------------------------------------------------------------------
-  // Train head model on top of MobileNet features
+  // Train selected classifier on top of MobileNet features
   // -------------------------------------------------------------------------
   const onTrainHead = useCallback(async () => {
     if (!net) {
@@ -202,9 +271,82 @@ export default function HomeScreen() {
       return;
     }
 
-    setLoading("Extracting features & training head model...");
     setPred(null);
+
+    if (trainingAlgorithm === "kmeans_centroid") {
+      setLoading("Extracting features & building k-means classifier...");
+      if (headModel) {
+        headModel.dispose();
+      }
+      setHeadModel(null);
+      setKMeansClassifier(null);
+
+      try {
+        const labels = Array.from(new Set(trainFiles.map((t) => t.label))).sort();
+        const sums: Record<string, number[]> = {};
+        const counts: Record<string, number> = {};
+        let featureDim: number | null = null;
+
+        pushMsg(
+          `Training k-means classifier on ${trainFiles.length} example(s), ${labels.length} class(es)...`
+        );
+
+        for (let i = 0; i < trainFiles.length; i++) {
+          const { file, label } = trainFiles[i];
+          const vec = await extractNormalizedEmbedding(net, file);
+
+          if (featureDim == null) {
+            featureDim = vec.length;
+          }
+          if (featureDim !== vec.length) {
+            throw new Error("Feature dimension changed while extracting embeddings.");
+          }
+
+          if (!sums[label]) {
+            sums[label] = new Array(vec.length).fill(0);
+            counts[label] = 0;
+          }
+          for (let j = 0; j < vec.length; j++) {
+            sums[label][j] += vec[j];
+          }
+          counts[label] += 1;
+
+          if (i % 16 === 0) {
+            await tf.nextFrame();
+          }
+        }
+
+        if (featureDim == null) {
+          throw new Error("Could not infer feature dimension.");
+        }
+
+        const centroids = labels.map((label) => {
+          const count = counts[label] || 1;
+          const mean = sums[label].map((v) => v / count);
+          return l2Normalize(mean);
+        });
+
+        setKMeansClassifier({
+          labels,
+          centroids,
+          featureDim,
+          examplesPerLabel: counts,
+        });
+        pushMsg("K-means classifier is ready. You can now run predictions.");
+      } catch (e: any) {
+        pushMsg(`[ERROR] train k-means: ${e?.message || String(e)}`);
+      } finally {
+        setLoading(null);
+      }
+      return;
+    }
+
+    setLoading("Extracting features & training head model...");
+    if (headModel) {
+      headModel.dispose();
+    }
     setHeadModel(null);
+    setKMeansClassifier(null);
 
     try {
       // Build label index mapping
@@ -322,7 +464,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(null);
     }
-  }, [net, trainFiles, pushMsg]);
+  }, [headModel, net, trainFiles, trainingAlgorithm, pushMsg]);
 
   // -------------------------------------------------------------------------
   // Test image selection & Predict button
@@ -342,12 +484,52 @@ export default function HomeScreen() {
       pushMsg("Base model is not ready yet.");
       return;
     }
-    if (!headModel) {
-      pushMsg("Head model is not trained yet. Click 'Train head model' first.");
-      return;
-    }
     if (!testFile) {
       pushMsg("Pick a test image first.");
+      return;
+    }
+
+    if (trainingAlgorithm === "kmeans_centroid") {
+      if (!kMeansClassifier) {
+        pushMsg("K-means classifier is not trained yet. Click 'Train' first.");
+        return;
+      }
+
+      setLoading("Running k-means inference...");
+      setPred(null);
+
+      try {
+        const vec = await extractNormalizedEmbedding(net, testFile);
+        if (vec.length !== kMeansClassifier.featureDim) {
+          throw new Error("Feature dimension is inconsistent with the trained classifier.");
+        }
+
+        const distances = kMeansClassifier.centroids.map((centroid) =>
+          squaredDistance(vec, centroid)
+        );
+        let bestIdx = 0;
+        for (let i = 1; i < distances.length; i++) {
+          if (distances[i] < distances[bestIdx]) bestIdx = i;
+        }
+
+        const confidences = confidencesFromDistances(
+          kMeansClassifier.labels,
+          distances
+        );
+        const topLabel = kMeansClassifier.labels[bestIdx];
+
+        setPred({ label: topLabel, confidences });
+        pushMsg(`Prediction: ${topLabel}`);
+      } catch (e: any) {
+        pushMsg(`[ERROR] predict k-means: ${e?.message || String(e)}`);
+      } finally {
+        setLoading(null);
+      }
+      return;
+    }
+
+    if (!headModel) {
+      pushMsg("Head model is not trained yet. Click 'Train' first.");
       return;
     }
 
@@ -396,7 +578,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(null);
     }
-  }, [net, headModel, testFile, pushMsg]);
+  }, [net, headModel, kMeansClassifier, testFile, trainingAlgorithm, pushMsg]);
 
   // Clear all
   const onClearAll = useCallback(() => {
@@ -410,7 +592,8 @@ export default function HomeScreen() {
       headModel.dispose();
     }
     setHeadModel(null);
-    pushMsg("Cleared training data, test image, and head model.");
+    setKMeansClassifier(null);
+    pushMsg("Cleared training data, test image, and trained classifiers.");
   }, [headModel, pushMsg]);
 
   const REPO_URL = "https://github.com/europanite/client_side_ai_training";
@@ -616,11 +799,51 @@ export default function HomeScreen() {
           backgroundColor: "#fff",
         }}
       >
-        <SectionTitle>2. Head model</SectionTitle>
+        <SectionTitle>2. Training algorithm</SectionTitle>
         <Text style={{ marginBottom: 8 }}>
-          This trains a small dense classifier on top of MobileNet
-          embeddings, entirely in your browser.
+          Select the classifier used on top of MobileNet embeddings.
+          Dense head is the original trainable neural classifier. K-means
+          is a fast centroid-based lightweight classifier.
         </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 10,
+          }}
+        >
+          {TRAINING_ALGORITHMS.map((opt) => {
+            const selected = trainingAlgorithm === opt.id;
+            return (
+              <TouchableOpacity
+                key={opt.id}
+                onPress={() => setTrainingAlgorithm(opt.id)}
+                style={{
+                  backgroundColor: selected ? "#dbeafe" : "#f8fafc",
+                  borderWidth: 1,
+                  borderColor: selected ? "#60a5fa" : "#cbd5e1",
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  maxWidth: 260,
+                }}
+              >
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    color: selected ? "#1d4ed8" : "#334155",
+                  }}
+                >
+                  {opt.title}
+                </Text>
+                <Text style={{ color: "#64748b", fontSize: 12 }}>
+                  {opt.note}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         <TouchableOpacity
           onPress={onTrainHead}
           style={{
@@ -639,7 +862,7 @@ export default function HomeScreen() {
               color: "#166534",
             }}
           >
-            Train
+            {trainingAlgorithm === "dense_head" ? "Train head model" : "Train k-means"}
           </Text>
         </TouchableOpacity>
         <Text
@@ -649,8 +872,8 @@ export default function HomeScreen() {
             marginTop: 8,
           }}
         >
-          Tip: keep the dataset small (e.g. 10–200 images) for fast
-          training. You can always reload the page to start over.
+          Tip: use K-means for quick checks with very small datasets. Use
+          Dense head when you want the original trainable classifier.
         </Text>
       </View>
 
@@ -666,7 +889,7 @@ export default function HomeScreen() {
       >
         <SectionTitle>3. Test &amp; Predict</SectionTitle>
         <Text style={{ marginBottom: 8 }}>
-          Select a test image and then press "Predict" to use the head model.
+          Select a test image and then press "Predict" to use the selected trained classifier.
         </Text>
         <View
           style={{
@@ -864,9 +1087,9 @@ export default function HomeScreen() {
         }}
       >
         Notes: Folder format is <code>.../&lt;label&gt;/&lt;image
-        files&gt;</code>. Select a folder, click{" "}
-        <b>Train head model</b>, then choose a test image and click{" "}
-        <b>Predict</b>. Images never leave your device.
+        files&gt;</code>. Select a folder, choose an algorithm, click{" "}
+        <b>Train</b>, then choose a test image and click <b>Predict</b>.
+        Images never leave your device.
       </Text>
     </ScrollView>
   );
