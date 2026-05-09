@@ -27,8 +27,6 @@ jobs:
       - name: Install deps
         working-directory: frontend/app
         run: npm ci
-      - name: Prepare bundled validation data
-        run: node scripts/prepare_public_data.js data frontend/app/public/data_manifest.json data --limit 500 --copy-to frontend/app/public/data
       - name: Build (expo export -p web)
         working-directory: frontend/app
         run: npx expo export -p web
