@@ -1,0 +1,25 @@
+{
+  "name": "pose-3d-check-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "web": "expo start --web --host lan --port 8081",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~3.2.3",
+    "@react-three/fiber": "^8.17.10",
+    "expo": "~51.0.39",
+    "expo-image-picker": "~15.0.7",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-svg": "15.2.0",
+    "three": "^0.164.1"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.79",
+    "@types/three": "^0.164.0",
+    "typescript": "~5.3.3"
+  }
+}
