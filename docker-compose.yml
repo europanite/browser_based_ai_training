@@ -28,6 +28,6 @@ services:
       - "8081:8081"    # Metro bundler
     command: |-
       sh -lc "
-        node /workspace/scripts/prepare_public_data.js /workspace/data /app/public/data_manifest.json data --limit 500 --copy-to /app/public/data &&
+        node /workspace/scripts/prepare_public_data.js /app/public/data /app/public/data_manifest.json data &&
         npx expo start
       "
